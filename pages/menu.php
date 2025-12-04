@@ -1,15 +1,10 @@
 <?php
 require_once __DIR__ . '/../includes/header.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 $lang = $_SESSION['lang'] ?? 'id';
 
-// --- FUNGSI BANTUAN (PENGGANTI esc) ---
-// Mengamankan output text HTML agar tidak error
-function e($string) {
+// --- FUNGSI PENGAMAN KHUSUS FILE INI ---
+function safe($string) {
     return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
 }
 
@@ -56,32 +51,27 @@ $resAll = $conn->query($sqlAll);
 if ($resAll) {
     while ($row = $resAll->fetch_assoc()) {
         $cid = (int)$row['category_id'];
-
-        // Pilih nama kategori sesuai bahasa (ID/EN)
         $catName = ($lang === 'en') ? $row['name_en'] : $row['name_id'];
 
         if (!isset($categories[$cid])) {
             $categories[$cid] = $catName;
         }
-
         $itemsByCat[$cid][] = $row;
     }
 }
 
 // 3. SIAPKAN TAB NAVIGASI
 $tabs = [];
+
+// Tab 1: Signature
 if (!empty($signatureMenus)) {
-    $tabs[] = [
-        'id'    => 'menu-signature',
-        'label' => 'Signature',
-    ];
+    $tabs[] = ['id' => 'menu-signature', 'label' => 'Signature'];
 }
+
+// Tab Sisa: Kategori Database (Skip ID 1 karena Signature)
 foreach ($categories as $cid => $cname) {
-    $tabs[] = [
-        'id'    => 'menu-cat-' . $cid,
-        'label' => $cname,
-        'cid'   => $cid,
-    ];
+    if ($cid == 1) continue; 
+    $tabs[] = ['id' => 'menu-cat-' . $cid, 'label' => $cname];
 }
 ?>
 
@@ -90,8 +80,9 @@ foreach ($categories as $cid => $cname) {
     <section class="menu-hero">
         <div class="menu-hero-inner">
             <p class="menu-kicker">Menu Selezione</p>
-            <h1 class="menu-title">Selezione Dua Meja</h1>
-            <p class="menu-subtitle">
+            <h1 class="menu-title">Dua Meja Satu Rasa</h1>
+            
+            <p class="menu-subtitle" style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 15px; font-style: italic; opacity: 0.9;">
                 Harga belum termasuk pajak &amp; layanan. Setiap hidangan diracik untuk menghadirkan
                 harmoni antara cita rasa Indonesia dan teknik Italia.
             </p>
@@ -100,9 +91,9 @@ foreach ($categories as $cid => $cname) {
 
     <nav class="menu-tabs">
         <?php foreach ($tabs as $index => $tab): ?>
-            <a href="#<?= e($tab['id']) ?>"
+            <a href="#<?= safe($tab['id']) ?>"
                class="menu-tab-link <?= $index === 0 ? 'is-active' : '' ?>">
-                <?= e($tab['label']) ?>
+                <?= safe($tab['label']) ?>
             </a>
         <?php endforeach; ?>
     </nav>
@@ -112,6 +103,7 @@ foreach ($categories as $cid => $cname) {
         <?php if (!empty($signatureMenus)): ?>
             <section id="menu-signature" class="menu-section">
                 <div class="menu-section-header">
+                    <div class="menu-section-divider"></div>
                     <span class="menu-section-kicker">Signature</span>
                     <div class="menu-section-divider"></div>
                 </div>
@@ -119,54 +111,44 @@ foreach ($categories as $cid => $cname) {
                 <div class="menu-section-grid">
                     <?php foreach ($signatureMenus as $item): ?>
                         <?php
-                        // Setup Data
                         $title = $item['name'];
                         $desc  = $lang === 'en'
                             ? ($item['description_en'] ?: $item['description_id'])
                             : ($item['description_id'] ?: $item['description_en']);
 
-                        // --- LOGIKA GAMBAR PINTAR ---
-                        // 1. Tentukan nama file (dari DB atau dari Nama Menu + .jpg)
+                        // Logika Gambar Pintar
                         $filename = !empty($item['image_path']) ? $item['image_path'] : $title . '.jpg';
-                        
-                        // 2. Cek apakah file fisik ada di folder assets/img/
                         $physicalPath = __DIR__ . '/../assets/img/' . $filename;
                         
                         if (file_exists($physicalPath)) {
-                            // 3. Jika ada, gunakan path tersebut (rawurlencode untuk menangani spasi)
                             $imgSrc = "../assets/img/" . rawurlencode($filename);
                         } else {
-                            // 4. Jika tidak ada, gunakan placeholder online
                             $imgSrc = "https://placehold.co/600x400/0f172a/FFF?text=" . rawurlencode($title);
                         }
-                        // ----------------------------
                         ?>
 
                         <article class="menu-item-card">
                             <div class="menu-item-image">
-                                <img src="<?= e($imgSrc) ?>" alt="<?= e($title) ?>">
+                                <img src="<?= safe($imgSrc) ?>" alt="<?= safe($title) ?>">
                             </div>
-
                             <div class="menu-item-body">
                                 <div class="menu-item-header-line">
                                     <div class="menu-item-text">
-                                        <h3 class="menu-item-title"><?= e($title) ?></h3>
+                                        <h3 class="menu-item-title"><?= safe($title) ?></h3>
                                         <?php if (!empty($desc)): ?>
-                                            <p class="menu-item-desc"><?= e($desc) ?></p>
+                                            <p class="menu-item-desc"><?= safe($desc) ?></p>
                                         <?php endif; ?>
                                     </div>
-
                                     <div class="menu-item-price-block">
                                         <span class="menu-item-price">
                                             Rp <?= number_format($item['price'], 0, ',', '.') ?>
                                         </span>
-
-                                        <form method="post" action="../cart_action.php">
+                                        <form method="post" action="/cart_action.php">
                                             <input type="hidden" name="menu_id" value="<?= (int)$item['id'] ?>">
                                             <input type="hidden" name="action" value="add">
-                                            <button type="submit" class="menu-add-btn">
-                                                + Keranjang
-                                            </button>
+                                            <!-- balik lagi ke tab Signature -->
+                                            <input type="hidden" name="redirect" value="/pages/menu.php#menu-signature">
+                                            <button type="submit" class="menu-add-btn">Tambahkan</button>
                                         </form>
                                     </div>
                                 </div>
@@ -179,9 +161,12 @@ foreach ($categories as $cid => $cname) {
         <?php endif; ?>
 
         <?php foreach ($categories as $cid => $cname): ?>
+            <?php if ($cid == 1) continue; ?>
+            
             <section id="menu-cat-<?= (int)$cid ?>" class="menu-section">
                 <div class="menu-section-header">
-                    <span class="menu-section-kicker"><?= e(strtoupper($cname)) ?></span>
+                    <div class="menu-section-divider"></div>
+                    <span class="menu-section-kicker"><?= safe(strtoupper($cname)) ?></span>
                     <div class="menu-section-divider"></div>
                 </div>
 
@@ -191,13 +176,11 @@ foreach ($categories as $cid => $cname) {
                     <div class="menu-section-grid">
                         <?php foreach ($itemsByCat[$cid] as $item): ?>
                             <?php
-                            // Setup Data
                             $title = $item['name'];
                             $desc  = $lang === 'en'
                                 ? ($item['description_en'] ?: $item['description_id'])
                                 : ($item['description_id'] ?: $item['description_en']);
 
-                            // --- LOGIKA GAMBAR PINTAR (Sama seperti di atas) ---
                             $filename = !empty($item['image_path']) ? $item['image_path'] : $title . '.jpg';
                             $physicalPath = __DIR__ . '/../assets/img/' . $filename;
                             
@@ -206,34 +189,30 @@ foreach ($categories as $cid => $cname) {
                             } else {
                                 $imgSrc = "https://placehold.co/600x400/0f172a/FFF?text=" . rawurlencode($title);
                             }
-                            // ----------------------------
                             ?>
 
                             <article class="menu-item-card">
                                 <div class="menu-item-image">
-                                    <img src="<?= e($imgSrc) ?>" alt="<?= e($title) ?>">
+                                    <img src="<?= safe($imgSrc) ?>" alt="<?= safe($title) ?>">
                                 </div>
-
                                 <div class="menu-item-body">
                                     <div class="menu-item-header-line">
                                         <div class="menu-item-text">
-                                            <h3 class="menu-item-title"><?= e($title) ?></h3>
+                                            <h3 class="menu-item-title"><?= safe($title) ?></h3>
                                             <?php if (!empty($desc)): ?>
-                                                <p class="menu-item-desc"><?= e($desc) ?></p>
+                                                <p class="menu-item-desc"><?= safe($desc) ?></p>
                                             <?php endif; ?>
                                         </div>
-
                                         <div class="menu-item-price-block">
                                             <span class="menu-item-price">
                                                 Rp <?= number_format($item['price'], 0, ',', '.') ?>
                                             </span>
-
-                                            <form method="post" action="../cart_action.php">
+                                            <form method="post" action="/cart_action.php">
                                                 <input type="hidden" name="menu_id" value="<?= (int)$item['id'] ?>">
                                                 <input type="hidden" name="action" value="add">
-                                                <button type="submit" class="menu-add-btn">
-                                                    + Keranjang
-                                                </button>
+                                                <!-- balik ke kategori yang sama -->
+                                                <input type="hidden" name="redirect" value="/pages/menu.php#menu-cat-<?= (int)$cid ?>">
+                                                <button type="submit" class="menu-add-btn">Tambahkan</button>
                                             </form>
                                         </div>
                                     </div>
@@ -247,9 +226,6 @@ foreach ($categories as $cid => $cname) {
         <?php endforeach; ?>
 
     </div>
-
 </main>
 
-<?php
-require_once __DIR__ . '/../includes/footer.php';
-?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
